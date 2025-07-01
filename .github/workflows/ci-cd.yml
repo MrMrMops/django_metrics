@@ -19,11 +19,24 @@ jobs:
 
       - name: Create .env
         run: |
+          # Обязательные для PostgreSQL контейнера
+          echo "POSTGRES_DB=${{ secrets.DB_NAME }}" >> .env
+          echo "POSTGRES_USER=${{ secrets.DB_USER }}" >> .env
+          echo "POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          
+          # Для Django приложения
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+          echo "DB_HOST=db" >> .env
           echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
           echo "DB_USER=${{ secrets.DB_USER }}" >> .env
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
-          echo "DB_HOST=db" >> .env
+          
+          # Дополнительно для удобства
+          echo "DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@db:5432/${{ secrets.DB_NAME }}" >> .env
+          
+          # Проверяем создание файла
+          echo ".env content:"
+          cat .env | grep -v PASSWORD  # Выводим без паролей
 
       - name: Build images
         run: docker compose build
@@ -39,7 +52,7 @@ jobs:
           until [ $(docker compose ps -q db | wc -l) -gt 0 ]; do
             sleep 2
             COUNTER=$((COUNTER+1))
-            if [ $COUNTER -gt 30 ]; then
+            if [ $COUNTER -gt 15 ]; then  # Уменьшили таймаут
               echo "Database container failed to start!"
               docker compose logs db
               exit 1
@@ -54,7 +67,7 @@ jobs:
           until docker exec $DB_CONTAINER_ID pg_isready -U ${{ secrets.DB_USER }}; do
             sleep 2
             COUNTER=$((COUNTER+1))
-            if [ $COUNTER -gt 30 ]; then
+            if [ $COUNTER -gt 15 ]; then  # Уменьшили таймаут
               echo "Database never became ready!"
               docker compose logs db
               exit 1
@@ -73,3 +86,5 @@ jobs:
       - name: Shutdown all services
         if: always()
         run: docker compose down -v
+
+      
