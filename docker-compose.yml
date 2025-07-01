@@ -3,7 +3,7 @@ version: '3.9'
 services:
   web:
     build: .
-    command: gunicorn monitoring_platform.wsgi:application --bind 0.0.0.0:8000
+    command: sh -c "python manage.py migrate && gunicorn monitoring_platform.wsgi:application --bind 0.0.0.0:8000"
     volumes:
       - .:/app
       - ./staticfiles:/app/staticfiles
@@ -28,7 +28,7 @@ services:
 
   celery:
     build: .
-    command: celery -A monitoring_platform worker --loglevel=debug
+    command: celery -A monitoring_platform worker --loglevel=info
     volumes:
       - .:/code
     env_file:
@@ -39,7 +39,7 @@ services:
 
   celery-beat:
     build: .
-    command: celery -A monitoring_platform beat --loglevel=debug
+    command: celery -A monitoring_platform beat --loglevel=info
     volumes:
       - .:/code
     env_file:
