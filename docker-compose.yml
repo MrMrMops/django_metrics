@@ -1,76 +1,59 @@
+name: CI/CD Pipeline
 
-services:
-  web:
-    build: .
-    command: sh -c "python manage.py migrate && gunicorn monitoring_platform.wsgi:application --bind 0.0.0.0:8000"
-    volumes:
-      - .:/app
-      - ./staticfiles:/app/staticfiles
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    depends_on:
-      db:
-        condition: service_healthy
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
 
-  db:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4  # Обновим до v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-  redis:
-    image: redis:7
+      - name: Create .env
+        run: |
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+          echo "DB_HOST=db" >> .env  # Добавим явное указание хоста
 
-  celery:
-    build: .
-    command: celery -A monitoring_platform worker --loglevel=info
-    volumes:
-      - .:/code
-    env_file:
-      - .env
-    depends_on:
-      - web
-      - redis
+      - name: Build images
+        run: docker compose build
 
-  celery-beat:
-    build: .
-    command: celery -A monitoring_platform beat --loglevel=info
-    volumes:
-      - .:/code
-    env_file:
-      - .env
-    depends_on:
-      - web
-      - redis
+      - name: Start dependent services (db, redis)
+        run: docker compose up -d db redis
 
-  prometheus:
-    image: prom/prometheus:latest
-    volumes:
-      - ./metrics/prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9090:9090"
-    depends_on:
-      - web
+      - name: Wait for database to be ready
+        run: |
+          # Ждем пока контейнер db запустится
+          sleep 10
+          
+          # Проверяем статус healthcheck
+          DB_CONTAINER_ID=$(docker compose ps -q db)
+          for i in {1..10}; do
+            HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' $DB_CONTAINER_ID)
+            echo "Database health status: $HEALTH_STATUS"
+            [ "$HEALTH_STATUS" == "healthy" ] && break
+            sleep 5
+          done
+          
+          # Если после 10 попыток БД не готова - выходим с ошибкой
+          [ "$HEALTH_STATUS" != "healthy" ] && echo "Database not ready!" && exit 1
 
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin  # пароль администратора Grafana
-    depends_on:
-      - prometheus
-volumes:
-  postgres_data:
-  grafana_data:
-  
+      - name: Run migrations
+        run: docker compose run --rm web python manage.py migrate
+
+      - name: Run tests
+        run: docker compose run --rm web pytest
+
+      - name: Shutdown all services
+        if: always()
+        run: docker compose down -v
