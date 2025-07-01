@@ -24,13 +24,13 @@ jobs:
           echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
 
       - name: Build and start services
-        run: docker-compose up -d --build
+        run: docker compose up -d --build
 
       - name: Run migrations
-        run: docker-compose exec web python manage.py migrate
+        run: docker compose exec web python manage.py migrate
 
       - name: Run tests
-        run: docker-compose exec web pytest
+        run: docker compose exec web pytest
 
       - name: Shutdown services
         if: always()
