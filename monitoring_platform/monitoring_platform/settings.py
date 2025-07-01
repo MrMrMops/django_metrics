@@ -33,7 +33,7 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 # Настройки
 DEBUG = env('DEBUG')
 SECRET_KEY = env('SECRET_KEY')
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 
@@ -47,7 +47,6 @@ INSTALLED_APPS = [
 
     'core',
     'tasks',
-    'prometheus_app',
     'accounts',
 
     'django_prometheus',
@@ -65,6 +64,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     'django_prometheus.middleware.PrometheusAfterMiddleware',
     'django_prometheus.middleware.PrometheusBeforeMiddleware',
 ]
@@ -92,24 +92,23 @@ WSGI_APPLICATION = 'monitoring_platform.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
-# ОБНОВИТЬ КОГДА БУДЕТ ДОКЕР
 # DATABASES = {
 #     'default': {
-#         'ENGINE': 'django_prometheus.db.backends.postgresql',
-#         'NAME': os.getenv("DB_NAME", "postgres"),
-#         'USER': os.getenv("DB_USER", "postgres"),
-#         'PASSWORD': os.getenv("DB_PASSWORD", "postgres"),
-#         'HOST': os.getenv("DB_HOST", "db"),
-#         'PORT': os.getenv("DB_PORT", "5432"),
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django_prometheus.db.backends.postgresql',
+        'NAME': os.getenv("DB_NAME", "postgres"),
+        'USER': os.getenv("DB_USER", "postgres"),
+        'PASSWORD': os.getenv("DB_PASSWORD", "postgres"),
+        'HOST': os.getenv("DB_HOST", "db"),
+        'PORT': os.getenv("DB_PORT", "5432"),
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -168,8 +167,10 @@ CELERY_TASK_SERIALIZER = 'json'
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

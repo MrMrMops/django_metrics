@@ -9,7 +9,7 @@ from .models import Task
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
-        fields = '__all__'
+        fields = ('title', 'description', 'is_completed', 'created_at')
 
     def validate_title(self, value):
         if len(value) < 3:
