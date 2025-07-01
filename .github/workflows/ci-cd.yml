@@ -14,64 +14,38 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. Создаем .env файл с тестовыми значениями (не из секретов)
-      - name: Create test environment
+      - name: Create .env
         run: |
           cat <<EOF > .env
           DB_NAME=testdb
           DB_USER=testuser
           DB_PASSWORD=testpassword
-          SECRET_KEY=debugsecret123
+          SECRET_KEY=debugsecret
           POSTGRES_DB=testdb
           POSTGRES_USER=testuser
           POSTGRES_PASSWORD=testpassword
           EOF
-          echo "Using TEST environment values"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # 2. Запускаем ТОЛЬКО базу данных и проверяем логи
-      - name: Start and debug PostgreSQL
-        run: |
-          # Запускаем только БД
-          docker compose up -d db
-          
-          # Ждем 5 секунд
-          sleep 5
-          
-          # Проверяем статус контейнера
-          docker ps -a
-          
-          # Показываем логи PostgreSQL
-          docker compose logs db
-          
-          # Проверяем, запущен ли контейнер
-          DB_STATUS=$(docker inspect -f '{{.State.Status}}' $(docker compose ps -q db))
-          echo "Database container status: $DB_STATUS"
-          
-          if [ "$DB_STATUS" != "running" ]; then
-            echo "Database container failed to start!"
-            exit 1
-          fi
+      - name: Build images
+        run: docker compose build
 
-      # 3. Проверяем доступность PostgreSQL
-      - name: Check PostgreSQL connection
+      - name: Start services
+        run: docker compose up -d db redis
+
+      - name: Wait for database
         run: |
+          sleep 5
           docker compose exec db pg_isready -U testuser
 
-      # 4. Остальные шаги
-      - name: Build other images
-        run: docker compose build redis web
-
-      - name: Start all services
-        run: docker compose up -d
-
+      # ИСПРАВЛЕННАЯ КОМАНДА
       - name: Run migrations
-        run: docker compose run --rm web python manage.py migrate
+        run: docker compose run --rm --no-entrypoint web python manage.py migrate
 
       - name: Run tests
-        run: docker compose run --rm web pytest
+        run: docker compose run --rm --no-entrypoint web pytest
 
       - name: Shutdown services
         if: always()
