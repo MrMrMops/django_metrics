@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pyd
+*.pdb
+*.egg-info/
+*.egg
+*.log
+*.sqlite3
+*.env
+.env.*
+.venv/
+venv/
+build/
+develop-eggs/
+dist/
+pip-wheel-metadata/
+
+# Django
+*.sqlite3
+db.sqlite3
+*.pot
+*.pyc
+local_settings.py
+staticfiles/
+media/
+*.mo
+
+# Migrations
+*/migrations/__pycache__/
+*/migrations/*.py[cod]
+*/migrations/*.pyc
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.cache
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# VSCode
+.vscode/
+
+# Docker
+docker-compose.override.yml
+docker-compose.test.yml
+docker-compose.prod.yml
+.docker/
+**/__docker_build__/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Git
+*.orig
+
+# MyPy
+.mypy_cache/
+
+# Prometheus & Grafana
+prometheus_data/
+grafana_data/
+
+# PostgreSQL
+postgres_data/
