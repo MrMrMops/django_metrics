@@ -14,42 +14,58 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Создаем .env ПЕРВЫМ шагом
-      - name: Create .env file
+      # 1. Создаем .env файл с тестовыми значениями (не из секретов)
+      - name: Create test environment
         run: |
           cat <<EOF > .env
-          DB_NAME=${{ secrets.DB_NAME }}
-          DB_USER=${{ secrets.DB_USER }}
-          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          SECRET_KEY=${{ secrets.SECRET_KEY }}
-          # Добавляем переменные для PostgreSQL контейнера
-          POSTGRES_DB=${{ secrets.DB_NAME }}
-          POSTGRES_USER=${{ secrets.DB_USER }}
-          POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_NAME=testdb
+          DB_USER=testuser
+          DB_PASSWORD=testpassword
+          SECRET_KEY=debugsecret123
+          POSTGRES_DB=testdb
+          POSTGRES_USER=testuser
+          POSTGRES_PASSWORD=testpassword
           EOF
-          
-          echo "Содержимое .env:"
-          cat .env | grep -v PASSWORD
+          echo "Using TEST environment values"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # Теперь docker compose увидит .env при запуске
-      - name: Build images
-        run: docker compose build
-
-      - name: Start services
-        run: docker compose up -d db redis
-
-      - name: Verify services
+      # 2. Запускаем ТОЛЬКО базу данных и проверяем логи
+      - name: Start and debug PostgreSQL
         run: |
+          # Запускаем только БД
+          docker compose up -d db
+          
+          # Ждем 5 секунд
           sleep 5
-          docker compose ps
+          
+          # Проверяем статус контейнера
+          docker ps -a
+          
+          # Показываем логи PostgreSQL
+          docker compose logs db
+          
+          # Проверяем, запущен ли контейнер
+          DB_STATUS=$(docker inspect -f '{{.State.Status}}' $(docker compose ps -q db))
+          echo "Database container status: $DB_STATUS"
+          
+          if [ "$DB_STATUS" != "running" ]; then
+            echo "Database container failed to start!"
+            exit 1
+          fi
 
-      - name: Verify PostgreSQL environment
+      # 3. Проверяем доступность PostgreSQL
+      - name: Check PostgreSQL connection
         run: |
-          docker compose exec db sh -c 'echo "POSTGRES_USER: $POSTGRES_USER"'
-          docker compose exec db sh -c 'echo "POSTGRES_DB: $POSTGRES_DB"'
+          docker compose exec db pg_isready -U testuser
+
+      # 4. Остальные шаги
+      - name: Build other images
+        run: docker compose build redis web
+
+      - name: Start all services
+        run: docker compose up -d
 
       - name: Run migrations
         run: docker compose run --rm web python manage.py migrate
