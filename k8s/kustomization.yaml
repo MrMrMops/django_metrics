@@ -1,0 +1,12 @@
+resources:
+  - base/namespace.yaml
+  - base/redis.yaml
+  - base/postgres.yaml
+  - base/configmap.yaml
+  - secrets/db-secret.yaml
+  - secrets/django-secret.yaml
+  - web/deployment.yaml
+  - web/service.yaml
+  - web/ingress.yaml
+  - celery/deployment.yaml
+  - celery-beat/deployment.yaml
