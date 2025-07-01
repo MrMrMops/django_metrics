@@ -2,11 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build-and-test:
@@ -14,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # Обновим до v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -25,26 +23,37 @@ jobs:
           echo "DB_USER=${{ secrets.DB_USER }}" >> .env
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
           echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+          echo "DB_HOST=db" >> .env  # Добавим явное указание хоста
 
       - name: Build images
-        run: docker compose -f docker-compose.yml --env-file .env build
+        run: docker compose build
 
-      - name: Start dependent services (db, redis) in background
-        run: docker compose -f docker-compose.yml --env-file .env up -d db redis
+      - name: Start dependent services (db, redis)
+        run: docker compose up -d db redis
 
       - name: Wait for database to be ready
         run: |
-          until docker compose exec db pg_isready -U ${{ secrets.DB_USER }}; do
-            echo "Waiting for database..."
-            sleep 3
+          # Ждем пока контейнер db запустится
+          sleep 10
+          
+          # Проверяем статус healthcheck
+          DB_CONTAINER_ID=$(docker compose ps -q db)
+          for i in {1..10}; do
+            HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' $DB_CONTAINER_ID)
+            echo "Database health status: $HEALTH_STATUS"
+            [ "$HEALTH_STATUS" == "healthy" ] && break
+            sleep 5
           done
+          
+          # Если после 10 попыток БД не готова - выходим с ошибкой
+          [ "$HEALTH_STATUS" != "healthy" ] && echo "Database not ready!" && exit 1
 
       - name: Run migrations
-        run: docker compose -f docker-compose.yml --env-file .env run --rm web python manage.py migrate
+        run: docker compose run --rm web python manage.py migrate
 
       - name: Run tests
-        run: docker compose -f docker-compose.yml --env-file .env run --rm web pytest
+        run: docker compose run --rm web pytest
 
       - name: Shutdown all services
         if: always()
-        run: docker compose -f docker-compose.yml down -v
+        run: docker compose down -v
