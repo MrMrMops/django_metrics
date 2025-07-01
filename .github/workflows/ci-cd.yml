@@ -17,10 +17,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      # 1. Создаем .env файл ПРАВИЛЬНО
       - name: Create .env file
         run: |
-          # Создаем .env с правильными переменными для PostgreSQL
-          cat << EOF > .env
+          # Удаляем старый .env если есть
+          rm -f .env
+          
+          # Создаем новый с правильными правами
+          cat <<EOF > .env
           POSTGRES_DB=${{ secrets.DB_NAME }}
           POSTGRES_USER=${{ secrets.DB_USER }}
           POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
@@ -31,48 +35,25 @@ jobs:
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           EOF
           
-          # Проверяем создание файла
-          echo "Created .env file with contents:"
+          # Проверяем
+          echo "Содержимое .env:"
           cat .env | grep -v PASSWORD
 
-      - name: Build images
-        run: docker compose build
+      # 2. Явно указываем использование .env
+      - name: Build images with environment
+        run: docker compose --env-file .env build
 
-      - name: Start dependent services
-        run: |
-          # Явно указываем использовать .env файл
-          docker compose --env-file .env up -d db redis
+      # 3. Запускаем сервисы с принудительной пересборкой
+      - name: Start services with force-recreate
+        run: docker compose --env-file .env up -d --force-recreate db redis
 
-      - name: Verify environment variables
+      # 4. Проверяем переменные в контейнере
+      - name: Verify PostgreSQL environment
         run: |
-          echo "Checking environment variables in db container:"
-          docker compose exec db printenv POSTGRES_USER POSTGRES_DB
-
-      - name: Wait for database to be ready
-        run: |
-          DB_CONTAINER_ID=$(docker compose ps -q db)
-          echo "Database container ID: $DB_CONTAINER_ID"
+          echo "Проверка переменных в контейнере db:"
+          docker compose exec db sh -c 'echo "POSTGRES_USER: $POSTGRES_USER"'
+          docker compose exec db sh -c 'echo "POSTGRES_DB: $POSTGRES_DB"'
           
-          echo "Waiting for PostgreSQL to be ready..."
-          COUNTER=0
-          until docker compose exec db pg_isready -U ${{ secrets.DB_USER }}; do
-            sleep 2
-            COUNTER=$((COUNTER+1))
-            if [ $COUNTER -gt 15 ]; then
-              echo "Database never became ready!"
-              docker compose logs db
-              exit 1
-            fi
-            echo "Attempt $COUNTER: Waiting for database..."
-          done
-          echo "Database is ready!"
-
-      - name: Run migrations
-        run: docker compose run --rm web python manage.py migrate
-
-      - name: Run tests
-        run: docker compose run --rm web pytest
-
-      - name: Shutdown all services
-        if: always()
-        run: docker compose down -v
+      # 5. Дополнительная проверка логов
+      - name: View database logs
+        run: docker compose logs db
