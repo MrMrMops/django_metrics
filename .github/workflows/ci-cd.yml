@@ -2,39 +2,39 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
-  build-and-test:
+  build-test-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Create .env
-        run: |
-          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
-          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
-          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+      - name: Set up Docker Compose
+        uses: docker/compose-action@v2
 
-      - name: Build and start services
+      - name: Copy example .env
+        run: cp .env.example .env
+
+      - name: Build and run containers
         run: docker compose -f docker-compose.yml --env-file .env up -d --build
 
+      - name: Wait for database to be ready
+        run: sleep 10  # Можно заменить на healthcheck в будущем
+
       - name: Run migrations
-        run: docker compose -f docker-compose.yml --env-file .env exec web python manage.py migrate
+        run: docker compose -f docker-compose.yml --env-file .env run --rm web python manage.py migrate
 
       - name: Run tests
-        run: docker compose -f docker-compose.yml --env-file .env exec web pytest
+        run: docker compose -f docker-compose.yml --env-file .env run --rm web pytest
 
-      - name: Shutdown services
+      - name: Stop and remove containers
         if: always()
-        run: docker compose -f docker-compose.yml down -v
+        run: docker compose -f docker-compose.yml --env-file .env down -v
