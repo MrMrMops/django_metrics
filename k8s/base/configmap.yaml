@@ -4,7 +4,8 @@ metadata:
   name: django-config
   namespace: django-project
 data:
-  DJANGO_SETTINGS_MODULE: "project.settings"
+  DJANGO_SETTINGS_MODULE: "monitoring_platform.settings"
   CELERY_BROKER_URL: "redis://redis:6379/0"
-  DATABASE_HOST: "postgres"
-  DATABASE_PORT: "5432"
+  DATABASE_HOST: "db"
+  DB_PORT: "5432"
+

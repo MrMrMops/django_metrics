@@ -13,10 +13,24 @@ spec:
       labels:
         app: celery-beat
     spec:
+      initContainers:
+        - name: wait-for-web
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for web:80..."
+              until nc -z web 80; do
+                echo "Web not available yet, sleeping..."
+                sleep 2
+              done
+              echo "Web is up!"
       containers:
         - name: celery-beat
-          image: your_dockerhub_username/your_image_name:latest
-          command: ["celery", "-A", "project", "beat", "--loglevel=info"]
+          image: web:latest
+          imagePullPolicy: Never
+          command: ["celery", "-A", "monitoring_platform", "beat", "--loglevel=info"]
           envFrom:
             - configMapRef:
                 name: django-config

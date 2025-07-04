@@ -15,8 +15,9 @@ spec:
     spec:
       containers:
         - name: celery
-          image: your_dockerhub_username/your_image_name:latest
-          command: ["celery", "-A", "project", "worker", "--loglevel=info"]
+          image:  web:latest
+          command: ["celery", "-A", "monitoring_platform", "worker", "--loglevel=info"]
+          imagePullPolicy: Never  
           envFrom:
             - configMapRef:
                 name: django-config

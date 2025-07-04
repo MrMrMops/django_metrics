@@ -13,9 +13,14 @@ spec:
       labels:
         app: web
     spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox
+          command: ['sh', '-c', 'until nc -z db 5432; do echo waiting for db; sleep 2; done']
       containers:
         - name: web
-          image: your_dockerhub_username/your_image_name:latest
+          image: web:latest
+          imagePullPolicy: Never
           ports:
             - containerPort: 8000
           envFrom:
@@ -23,3 +28,5 @@ spec:
                 name: django-config
             - secretRef:
                 name: django-secret
+            - secretRef:
+                name: db-secret
